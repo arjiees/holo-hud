@@ -44,3 +44,23 @@ test('the panel logs a failed tool call and counts the alert', async ($, on) => 
   expect((await ui.find({ type: 'Text', text: /✓ Read b\/notes\.md/ })) !== undefined).toBe(true)
   await ui.unmount()
 })
+
+test('a reply draws in the panel font until /hud font turns it off', async ($, on) => {
+  on('store.get', () => ({ value: undefined }))
+  on('store.set', () => ({ value: undefined }))
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+
+    return <Text>engine</Text>
+  })
+  const REPLY = { plugin: 'holo-hud', component: 'AssistantMessage', requestId: 'm1', surface: 'desktop', props: { text: '**hi**', isFirstOfReply: true } } as const
+
+  const mono = await $.ui.mount(REPLY)
+  expect((await mono.find({ type: 'Text' }))?.text).toBe('**hi**')
+  await mono.unmount()
+
+  await $.command.run({ command: 'hud', args: 'font' })
+  const plain = await $.ui.mount(REPLY)
+  expect((await plain.find({ type: 'Text' }))?.text).toBe('engine')
+  await plain.unmount()
+})
