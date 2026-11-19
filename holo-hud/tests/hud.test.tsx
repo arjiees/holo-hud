@@ -65,13 +65,19 @@ test('a reply draws in the panel font until /hud font turns it off', async ($, o
   await plain.unmount()
 })
 
-test('the look and panel come up when the app window attaches after start', async ($, on) => {
+test('the look and panel come up once an app window is attached, by event or at the first turn', async ($, on) => {
   let opened = 0
+  let surfaces: string[] = []
   on('ui.open', () => ({ value: { isPlaced: (opened += 1) > 0 } }))
+  on('session.surfaces', () => ({ value: surfaces }))
   on('session.attach', (_, e) => ({ clientId: e.clientId }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  on('clock.now', () => ({ value: 1 }))
 
-  await $.session.attach({ surface: 'desktop', clientId: 'c1' })
-  expect(opened).toBe(1)
-  await $.session.attach({ surface: 'terminal', clientId: 'c2' })
+  await $.session.attach({ surface: 'terminal', clientId: 'c0' })
+  expect(opened).toBe(0)
+
+  surfaces = ['desktop']
+  await $.turn.start({ text: 'hi', turnId: 't1' })
   expect(opened).toBe(1)
 })
