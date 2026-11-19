@@ -36,5 +36,6 @@ In the desktop app, where `/plugin` does not run: click + next to the prompt box
 - `/hud arc`, `/hud holo`, `/hud armor`: switch look. The reply also reports whether the theme and location lookup worked.
 - `/hud panel`: open the status panel.
 - `/hud quiet`: turn sounds and voice off or on.
+- `/hud font`: draw chat messages in the panel's monospaced font, or switch back. While it is on, formatting in replies shows as plain symbols and links are not clickable.
 
 The look draws in the desktop and mobile apps only. The continents are rough hand-drawn outlines, not an accurate map.
