@@ -231,7 +231,7 @@ const LOOKS: Record<string, Look> = {
 }
 const NAMES = Object.keys(LOOKS).join(' | ')
 // Printed by /hud so a session can be told apart from an older install; keep in step with plugin.json.
-const VERSION = '0.5.1'
+const VERSION = '0.5.2'
 const PANE = 'hud'
 const LOG_ROWS = 6
 // Voice lines only for turns long enough that you may have looked away.
@@ -467,12 +467,24 @@ function elapsed(ms: number): string {
   return `${pad(Math.floor(s / 3600))}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`
 }
 
+let isShown = false
+
+// The app's window connects after session.start, and a theme set before then was seen not to draw:
+// set it again, and open the panel, the first time a window that draws looks is there.
+async function show($: EngineInterface) {
+  if (isShown || !(await $.session.surfaces()).some(surface => surface === 'desktop' || surface === 'mobile')) {
+    return
+  }
+  const name = await read($, look)
+  isShown = (await applyLook($, name)).startsWith('Theme set, backdrop drawn')
+  void $.ui.open({ id: PANE, title: lookOf(name).title })
+}
+
 export const register: Register = on => {
   let turnStart = 0
   let warned = false
   let clearAlert: Timer | undefined
   let monoReplies = 0
-
   on('session.start', async ($, e, next) => {
     await $.command.register({ name: 'hud', description: `HUD: /hud ${NAMES} | panel | quiet | font` })
     const t = await $.clock.now()
@@ -513,13 +525,8 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // In a session the desktop app starts, its window connects after session.start: draw the look and panel then.
   on('session.attach', async ($, e, next) => {
-    if (e.surface === 'desktop' || e.surface === 'mobile') {
-      const name = await read($, look)
-      await applyLook($, name)
-      void $.ui.open({ id: PANE, title: lookOf(name).title })
-    }
+    await show($).catch(() => undefined)
 
     return next(e)
   })
@@ -557,12 +564,15 @@ export const register: Register = on => {
     $.ui.toast(lookOf(arg).hello)
     void cue($, 'online')
 
+    const windows = (await $.session.surfaces()).join(', ') || 'none'
     const font = (await read($, isMono)) ? `on, ${monoReplies} replies drawn in it` : 'off'
 
-    return { text: `HUD ${VERSION} switched to ${arg}. ${report} ${locationNote} Panel font: ${font}.` }
+    return { text: `HUD ${VERSION} switched to ${arg}. ${report} ${locationNote} Panel font: ${font}. Windows attached: ${windows}.` }
   })
 
   on('turn.start', async ($, e, next) => {
+    await show($).catch(() => undefined)
+
     if (e.agentId === undefined) {
       turnStart = await $.clock.now()
       warned = false
@@ -574,6 +584,8 @@ export const register: Register = on => {
   })
 
   on('turn.complete', async ($, e, next) => {
+    await show($).catch(() => undefined)
+
     if (e.agentId === undefined) {
       await update($, busy, () => false)
       await snapshot($).catch(() => undefined)
