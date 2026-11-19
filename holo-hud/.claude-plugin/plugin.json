@@ -1,6 +1,6 @@
 {
   "name": "holo-hud",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Sci-fi HUD: three looks, a live control-wall backdrop with matrix rain and a located globe (looks up your IP at ipwho.is), a status panel and chimes",
   "types": "./types/index.d.ts"
 }
