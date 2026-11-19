@@ -10,6 +10,7 @@ declare module 'claude-code' {
       busy: boolean
       alert: boolean
       isQuiet: boolean
+      isMono: boolean
       startedAt: number
       now: number
       minute: number
