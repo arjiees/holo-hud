@@ -230,6 +230,8 @@ const LOOKS: Record<string, Look> = {
   },
 }
 const NAMES = Object.keys(LOOKS).join(' | ')
+// Printed by /hud so a session can be told apart from an older install; keep in step with plugin.json.
+const VERSION = '0.5.1'
 const PANE = 'hud'
 const LOG_ROWS = 6
 // Voice lines only for turns long enough that you may have looked away.
@@ -469,6 +471,7 @@ export const register: Register = on => {
   let turnStart = 0
   let warned = false
   let clearAlert: Timer | undefined
+  let monoReplies = 0
 
   on('session.start', async ($, e, next) => {
     await $.command.register({ name: 'hud', description: `HUD: /hud ${NAMES} | panel | quiet | font` })
@@ -510,6 +513,17 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // In a session the desktop app starts, its window connects after session.start: draw the look and panel then.
+  on('session.attach', async ($, e, next) => {
+    if (e.surface === 'desktop' || e.surface === 'mobile') {
+      const name = await read($, look)
+      await applyLook($, name)
+      void $.ui.open({ id: PANE, title: lookOf(name).title })
+    }
+
+    return next(e)
+  })
+
   on('command.run', { command: 'hud' }, async ($, e) => {
     const arg = e.args.trim().toLowerCase()
 
@@ -543,7 +557,9 @@ export const register: Register = on => {
     $.ui.toast(lookOf(arg).hello)
     void cue($, 'online')
 
-    return { text: `HUD switched to ${arg}. ${report} ${locationNote}` }
+    const font = (await read($, isMono)) ? `on, ${monoReplies} replies drawn in it` : 'off'
+
+    return { text: `HUD ${VERSION} switched to ${arg}. ${report} ${locationNote} Panel font: ${font}.` }
   })
 
   on('turn.start', async ($, e, next) => {
@@ -614,6 +630,7 @@ export const register: Register = on => {
       return next(e)
     }
     const { Text } = $.ui.resolve(e)
+    monoReplies += 1
 
     return <Text mono>{e.props.text}</Text>
   })
