@@ -239,6 +239,7 @@ const look = atom({ plugin: 'holo-hud', key: 'look' } as const, 'arc')
 const busy = atom({ plugin: 'holo-hud', key: 'busy' } as const, false)
 const alert = atom({ plugin: 'holo-hud', key: 'alert' } as const, false)
 const isQuiet = atom({ plugin: 'holo-hud', key: 'isQuiet' } as const, false)
+const isMono = atom({ plugin: 'holo-hud', key: 'isMono' } as const, true)
 const startedAt = atom({ plugin: 'holo-hud', key: 'startedAt' } as const, 0)
 const now = atom({ plugin: 'holo-hud', key: 'now' } as const, 0)
 const minute = atom({ plugin: 'holo-hud', key: 'minute' } as const, 0)
@@ -470,7 +471,7 @@ export const register: Register = on => {
   let clearAlert: Timer | undefined
 
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'hud', description: `HUD: /hud ${NAMES} | panel | quiet` })
+    await $.command.register({ name: 'hud', description: `HUD: /hud ${NAMES} | panel | quiet | font` })
     const t = await $.clock.now()
 
     if ((await read($, startedAt)) === 0) {
@@ -493,6 +494,8 @@ export const register: Register = on => {
       locationNote = `Location lookup failed: ${err instanceof Error ? err.message : String(err)}`
     })
 
+    const mono = (await $.store.get('mono')) !== false
+    await update($, isMono, () => mono)
     const stored = await $.store.get('quiet')
     await update($, isQuiet, () => stored === true)
     const name = String((await $.store.get('look')) ?? 'arc')
@@ -524,8 +527,16 @@ export const register: Register = on => {
       return { text: quiet ? 'HUD sounds off.' : 'HUD sounds on.' }
     }
 
+    if (arg === 'font') {
+      const mono = !(await read($, isMono))
+      await update($, isMono, () => mono)
+      await $.store.set('mono', mono)
+
+      return { text: mono ? 'Chat uses the panel font. Formatting shows as plain symbols.' : 'Chat is back to the normal font and formatting.' }
+    }
+
     if (!(arg in LOOKS)) {
-      return { text: `Try: /hud ${NAMES} | panel | quiet` }
+      return { text: `Try: /hud ${NAMES} | panel | quiet | font` }
     }
     await $.store.set('look', arg)
     const report = await applyLook($, arg)
@@ -595,6 +606,31 @@ export const register: Register = on => {
     await finish('isError' in ran && ran.isError === true).catch(() => undefined)
 
     return ran
+  })
+
+  // The app has no font setting and Markdown takes no face, so the panel font costs a reply its formatting: /hud font undoes it.
+  on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
+    if ((e.surface !== 'desktop' && e.surface !== 'mobile') || !(await read($, isMono))) {
+      return next(e)
+    }
+    const { Text } = $.ui.resolve(e)
+
+    return <Text mono>{e.props.text}</Text>
+  })
+
+  on('ui.render', { component: 'UserMessage' }, async ($, e, next) => {
+    const isPrompt = e.props.task === undefined && e.props.from === undefined
+
+    if ((e.surface !== 'desktop' && e.surface !== 'mobile') || !isPrompt || !(await read($, isMono))) {
+      return next(e)
+    }
+    const { Box, Text } = $.ui.resolve(e)
+
+    return (
+      <Box alignSelf="flex-end" borderStyle="round" paddingX={1}>
+        <Text mono>{e.props.text}</Text>
+      </Box>
+    )
   })
 
   on('ui.render', { component: 'Backdrop' }, async ($, e, next) => {
