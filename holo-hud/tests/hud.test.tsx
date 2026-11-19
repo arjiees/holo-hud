@@ -64,3 +64,14 @@ test('a reply draws in the panel font until /hud font turns it off', async ($, o
   expect((await plain.find({ type: 'Text' }))?.text).toBe('engine')
   await plain.unmount()
 })
+
+test('the look and panel come up when the app window attaches after start', async ($, on) => {
+  let opened = 0
+  on('ui.open', () => ({ value: { isPlaced: (opened += 1) > 0 } }))
+  on('session.attach', (_, e) => ({ clientId: e.clientId }))
+
+  await $.session.attach({ surface: 'desktop', clientId: 'c1' })
+  expect(opened).toBe(1)
+  await $.session.attach({ surface: 'terminal', clientId: 'c2' })
+  expect(opened).toBe(1)
+})
